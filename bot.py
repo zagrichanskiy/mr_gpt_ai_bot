@@ -6,8 +6,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from gpt import GPTClient
 from speech import SpeechClient
-from telegram import Update
-from telegram.ext import Application, CallbackQueryHandler, ConversationHandler, PicklePersistence, filters, ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler
+from telegram import Update, constants
+from telegram.ext import InlineQueryHandler, Application, CallbackQueryHandler, ConversationHandler, PicklePersistence, filters, ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler
 from telegram.warnings import PTBUserWarning
 from typing import cast
 from uuid import uuid4
@@ -25,7 +25,25 @@ async def __handle_message(update: Update, chat_manager: ChatManager):
     logging.warning(f"Update received but ignored because it doesn't have a message")
     return
 
-  await chat_manager.handle_message(text=update.message.text, user_message_id=update.message.id)
+  text = update.message.text
+  if (update.message.chat.type in [constants.ChatType.GROUP, constants.ChatType.SUPERGROUP]):
+    bot_user = await chat_manager.bot.get_me()
+    bot_username = bot_user.username
+    bot_id = bot_user.id
+    mentioned = False
+    quouted = False
+
+    if bot_username in text:
+      mentioned = True
+      text = text.replace(f"@{bot_username}", "").strip()
+
+    if update.message.reply_to_message and update.message.reply_to_message.from_user.id == bot_id:
+      quouted = True
+
+    if not mentioned and not quouted:
+      return
+
+  await chat_manager.handle_message(text=text, update=update)
 
 async def __handle_audio(update: Update, chat_manager: ChatManager):
   if not update.message or not update.message.voice:
@@ -228,7 +246,7 @@ def __create_callback(gpt: GPTClient, speech: SpeechClient|None, chat_tasks: dic
         try:
           await current_task
         except Exception as e:
-          logging.warn(f"Error {e} in previous task for chat {chat_id}")
+          logging.warning(f"Error {e} in previous task for chat {chat_id}")
       return await invoke(update, context, chat_id)
 
     chat_tasks[chat_id] = asyncio.create_task(task())
