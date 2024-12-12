@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from gpt import GPTClient
 from models import AssistantMessage, Conversation, Role, SystemMessage, UserMessage
 from speech import SpeechClient
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import constants, Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ExtBot
 from typing import TypedDict, cast, final
 from uuid import uuid4
@@ -95,8 +95,33 @@ class ChatManager:
 
     logging.info(f"Started a new conversation for chat {self.context.chat_id}")
 
-  async def handle_message(self, *, text: str, user_message_id: int):
-    sent_message = await self.bot.send_message(chat_id=self.context.chat_id, text="Generating response...")
+  def get_thread_id(self, update: Update) -> int | None:
+    if update.effective_message and update.effective_message.is_topic_message:
+      return update.effective_message.message_thread_id
+    return None
+    
+  def is_group_chat(self, update: Update) -> bool:
+      if not update.effective_chat:
+          return False
+      return update.effective_chat.type in [
+          constants.ChatType.GROUP,
+          constants.ChatType.SUPERGROUP
+      ]
+
+  def get_reply_to_message_id(self, update: Update):
+    if self.is_group_chat(update):
+      return update.message.message_id
+    return None
+
+  async def handle_message(self, *, text: str, update: Update): #user_message_id: int):
+    user_message_id = update.message.message_id
+
+    # sent_message = await self.bot.send_message(chat_id=self.context.chat_id, text="Generating response...")
+    sent_message = await update.effective_message.reply_text(
+      message_thread_id=self.get_thread_id(update),
+      reply_to_message_id=self.get_reply_to_message_id(update),
+      text="Generating response..."
+    )
 
     user_message = UserMessage(user_message_id, text)
 
