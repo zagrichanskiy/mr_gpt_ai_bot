@@ -1,0 +1,53 @@
+name: Tag Version on Version Change
+
+on:
+  push:
+    branches: [ dev ]
+
+env:
+  USER_NAME: Oleh Zahrychanskyi
+  USER_EMAIL: zagrichanskiy@gmail.com
+
+jobs:
+  create-tag:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the code
+        uses: actions/checkout@v3
+
+      - name: Extract version from __version__.py
+        run: |
+          VERSION=$(python -c "exec(open('__version__.py').read()); print(__version__)" || echo "")
+          if [ -z "$VERSION" ]; then
+            echo "Version extraction failed. Ensure __version__.py is present and correctly formatted."
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Check if tag already exists
+        id: check_tag
+        run: |
+          echo ls remote: $(git ls-remote --tags origin || true)
+          echo grep refs/tags/...: $(git ls-remote --tags origin | grep -w "refs/tags/$VERSION" || true)
+
+          tag_exists=$(git ls-remote --tags origin | grep -w "refs/tags/$VERSION" || true)
+          if [ -n "$tag_exists" ]; then
+            tag_exists=true
+            echo "Tag $VERSION already exists."
+          else
+            tag_exists=false
+          fi
+
+          echo "tag_exists=$tag_exists" >> $GITHUB_OUTPUT
+
+      - name: Create and push the tag
+        if: steps.check_tag.outputs.tag_exists == 'false'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "$USER_NAME"
+          git config user.email "$USER_EMAIL"
+          git tag "$VERSION"
+          git push origin "$VERSION"
+          gh workflow run deploy-to-aws.yaml --ref $VERSION

@@ -105,7 +105,9 @@ if __name__ == "__main__":
     default=os.environ.get('TELEGRAM_GPT_AZURE_SPEECH_REGION') or 'westus',
     help="Azure Speech Services region. Default to be westus. Only valid when --azure-speech-key is set.",
   )
-  
+
+  logging.getLogger("httpx").setLevel(logging.WARNING)
+
   args = parser.parse_args()
 
   gpt_options = GPTOptions(args.openai_api_key, args.openai_model_name, args.azure_openai_endpoint, args.max_message_count)
