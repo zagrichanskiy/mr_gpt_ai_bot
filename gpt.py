@@ -10,20 +10,14 @@ from typing import cast
 class GPTOptions:
   api_key: str = field(repr=False)
   model_name: str = 'gpt-3.5-turbo'
-  azure_endpoint: str|None = None
   max_message_count: int|None = None
 
 class GPTClient:
   def __init__(self, *, options: GPTOptions):
     self.__model_name = options.model_name
     self.__max_message_count = options.max_message_count
-    self.__is_azure = options.azure_endpoint is not None
 
     openai.api_key = options.api_key
-    if options.azure_endpoint:
-      openai.api_base = options.azure_endpoint
-      openai.api_type = 'azure'
-      openai.api_version = "2023-03-15-preview"
 
     openai.aiosession.set(ClientSession(trust_env=True))
 
@@ -65,32 +59,19 @@ class GPTClient:
     return conversation
 
   async def __request(self, messages: list[Message]):
-    if self.__is_azure:
-      task = openai.ChatCompletion.acreate(
-        engine=self.__model_name,
-        messages=[{'role': message.role, 'content': message.content} for message in messages],
-      )
-    else:
-      task = openai.ChatCompletion.acreate(
-        model=self.__model_name,
-        messages=[{'role': message.role, 'content': message.content} for message in messages],
-      )
+    task = openai.ChatCompletion.acreate(
+      model=self.__model_name,
+      messages=[{'role': message.role, 'content': message.content} for message in messages],
+    )
     response = await asyncio.wait_for(task, 60)
     return cast(dict, response)['choices'][0]['message']['content']
 
   async def __stream(self, messages: list[Message]):
-    if self.__is_azure:
-      task = openai.ChatCompletion.acreate(
-        engine=self.__model_name,
-        messages=[{'role': message.role, 'content': message.content} for message in messages],
-        stream=True,
-      )
-    else:
-      task = openai.ChatCompletion.acreate(
-        model=self.__model_name,
-        messages=[{'role': message.role, 'content': message.content} for message in messages],
-        stream=True,
-      )
+    task = openai.ChatCompletion.acreate(
+      model=self.__model_name,
+      messages=[{'role': message.role, 'content': message.content} for message in messages],
+      stream=True,
+    )
     async for response in await task:
       content = cast(dict, response)['choices'][0]['delta'].get('content')
       if content:

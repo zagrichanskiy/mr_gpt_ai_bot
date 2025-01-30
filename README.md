@@ -124,8 +124,6 @@ services:
       # - TELEGRAM_GPT_WEBHOOK_URL=https://example.com
       # - TELEGRAM_GPT_OPENAI_MODEL_NAME=azure-gpt-35-turbo
       # - TELEGRAM_GPT_AZURE_OPENAI_ENDPOINT=https://example.openai.azure.com
-      # - TELEGRAM_GPT_AZURE_SPEECH_KEY=<AZURE_SPEECH_KEY>
-      # - TELEGRAM_GPT_AZURE_SPEECH_REGION=westus2
 
 volumes:
   telegram-gpt:
@@ -167,13 +165,6 @@ To enable webhook mode, set the `--webhook-url` to the public accessible URL of 
 
 The bot would listen on `0.0.0.0:80` by default. To change the listening address, set the `--webhook-listen-address` option. Only ports `443`, `80`, `88` and `8443` are allowed.
 
-### Support Voice Messages with Azure Cognitive Services
-
-`TelegramGPT` can convert voice messages to text and text to voice messages using [Azure Cognitive Services](https://azure.microsoft.com/en-us/services/cognitive-services).
-Follow [this guide](https://learn.microsoft.com/en-us/azure/cognitive-services/speech-service/get-started-speech-to-text) to create a Speech resource and get the API key and region.
-
-To enable voice messages, set the `--azure-speech-api-key` to the API key. Set the `--azure-speech-region` to the region of the Speech resource if it's different from `westus`.
-
 ### Use a Different Model
 
 By default, the bot uses the `gpt-3.5-turbo` model. To use a different chat completion model, set the `--openai-model-name` option to the model name.
@@ -205,5 +196,3 @@ For Docker Compose, add `http_proxy` and `https_proxy` environment variables to 
 | `--webhook-listen-address` | `TELEGRAM_GPT_WEBHOOK_LISTEN_ADDRESS` | Address to listen for telegram webhook requests in the format of <ip>:<port>. Only valid when `--webhook-url` is set. | `0.0.0.0:80` |
 | `--openai-model-name` | `TELEGRAM_GPT_OPENAI_MODEL_NAME` | Chat completion model name. If `--azure-openai-endpoint` is specified, this is the Azure OpenAI Service model deployment name. | `gpt-3.5-turbo` |
 | `--azure-openai-endpoint` | `TELEGRAM_GPT_AZURE_OPENAI_ENDPOINT` | Azure OpenAI Service endpoint. Set this option to use Azure OpenAI Service instead of OpenAI API. | |
-| `--azure-speech-key` | `TELEGRAM_GPT_AZURE_SPEECH_KEY` | Azure Speech Services API key. Set this option to enable voice messages powered by Azure speech-to-text and text-to-speech services. | |
-| `--azure-speech-region` | `TELEGRAM_GPT_AZURE_SPEECH_REGION` | Azure Speech Services region. Only valid when --azure-speech-key is set. | `westus` |

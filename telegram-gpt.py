@@ -1,9 +1,8 @@
 import argparse
 import logging
 import os
-from bot import BotOptions, WebhookOptions, run
+from bot import BotOptions, Bot, WebhookOptions
 from gpt import GPTClient, GPTOptions
-from speech import SpeechClient
 
 logging.basicConfig(
   format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -86,38 +85,16 @@ if __name__ == "__main__":
     default=os.environ.get('TELEGRAM_GPT_OPENAI_MODEL_NAME') or 'gpt-3.5-turbo',
     help="Chat completion model name (https://platform.openai.com/docs/models/model-endpoint-compatibility). If --azure-openai-endpoint is specified, this is the Azure OpenAI Service model deployment name. Default to be gpt-3.5-turbo.",
   )
-  parser.add_argument(
-    '--azure-openai-endpoint',
-    type=str,
-    default=os.environ.get('TELEGRAM_GPT_AZURE_OPENAI_ENDPOINT'),
-    help="Azure OpenAI Service endpoint. Set this option to use Azure OpenAI Service instead of OpenAI API."
-  )
-
-  parser.add_argument(
-    '--azure-speech-key',
-    type=str,
-    default=os.environ.get('TELEGRAM_GPT_AZURE_SPEECH_KEY'),
-    help="Azure Speech Services API key. Set this option to enable voice messages powered by Azure speech-to-text and text-to-speech services.",
-  )
-  parser.add_argument(
-    '--azure-speech-region',
-    type=str,
-    default=os.environ.get('TELEGRAM_GPT_AZURE_SPEECH_REGION') or 'westus',
-    help="Azure Speech Services region. Default to be westus. Only valid when --azure-speech-key is set.",
-  )
 
   logging.getLogger("httpx").setLevel(logging.WARNING)
 
   args = parser.parse_args()
 
-  gpt_options = GPTOptions(args.openai_api_key, args.openai_model_name, args.azure_openai_endpoint, args.max_message_count)
-  logging.info(f"Initializing GPTClient with options: {gpt_options}")
-  gpt = GPTClient(options=gpt_options)
-
-  speech = SpeechClient(args.azure_speech_key, args.azure_speech_region) if args.azure_speech_key is not None else None
+  gpt_options = GPTOptions(args.openai_api_key, args.openai_model_name, args.max_message_count)
 
   webhook_options = WebhookOptions(args.webhook_url, args.webhook_listen_address) if args.webhook_url is not None else None
   bot_options = BotOptions(args.telegram_token, set(args.chat_id), args.conversation_timeout, args.data_dir, webhook_options)
   logging.info(f"Starting bot with options: {bot_options}")
 
-  run(args.telegram_token, gpt, speech, bot_options)
+  bot = Bot(bot_options, gpt_options)
+  bot.run()

@@ -5,7 +5,6 @@ import logging
 from dataclasses import dataclass, field
 from gpt import GPTClient
 from models import AssistantMessage, Conversation, Role, SystemMessage, UserMessage
-from speech import SpeechClient
 from telegram import constants, Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ExtBot
 from typing import TypedDict, cast, final
@@ -69,9 +68,8 @@ class ChatContext:
     self.__chat_data['current_mode_id'] = mode.id if mode else None
 
 class ChatManager:
-  def __init__(self, *, gpt: GPTClient, speech: SpeechClient|None, bot: ExtBot, context: ChatContext, conversation_timeout: int|None):
+  def __init__(self, *, gpt: GPTClient, bot: ExtBot, context: ChatContext, conversation_timeout: int|None):
     self.__gpt = gpt
-    self.__speech = speech
     self.bot = bot
     self.context = context
     self.__conversation_timeout = conversation_timeout
@@ -99,7 +97,7 @@ class ChatManager:
     if update.effective_message and update.effective_message.is_topic_message:
       return update.effective_message.message_thread_id
     return None
-    
+
   def is_group_chat(self, update: Update) -> bool:
       if not update.effective_chat:
           return False
@@ -135,42 +133,13 @@ class ChatManager:
 
     return conversation
 
-  async def handle_audio(self, *, audio: bytearray, user_message_id: int):
-    chat_id = self.context.chat_id
-    if not self.__speech:
-      await self.bot.send_message(chat_id=chat_id, text="Speech recognition is not available for this chat.")
-      return
-
-    sent_message = await self.bot.send_message(chat_id=chat_id, text="Recognizing audio...", reply_to_message_id=user_message_id)
-
-    try:
-      text = await self.__speech.speech_to_text(audio=audio)
-    except Exception as e:
-      await self.bot.edit_message_text(chat_id=chat_id, message_id=sent_message.id, text="Could not recognize audio")
-      logging.warning(f"Could not recognize audio for chat {chat_id}: {e}")
-      return
-
-    logging.info(f"Recognized audio: \"{text}\" for chat {chat_id}")
-
-    if not text:
-      await self.bot.edit_message_text(chat_id=chat_id, message_id=sent_message.id, text="Could not recognize audio")
-      return
-
-    await self.bot.edit_message_text(chat_id=chat_id, message_id=sent_message.id, text=f"You said: \"{text}\"")
-    conversation = await self.handle_message(text=text, user_message_id=user_message_id)
-
-    if not conversation.last_message or not conversation.last_message.role == Role.ASSISTANT:
-      return
-
-    await self.__read_out_message(cast(AssistantMessage, conversation.last_message))
-
   async def retry_last_message(self):
     chat_id = self.context.chat_id
     conversation = self.context.chat_state.current_conversation
     if not conversation:
       await self.bot.send_message(chat_id=chat_id, text="No conversation to retry")
       return
-      
+
     sent_message = await self.bot.send_message(chat_id=chat_id, text="Regenerating response...")
 
     if conversation.last_message and conversation.last_message.role == Role.ASSISTANT:
@@ -372,7 +341,7 @@ class ChatManager:
       retry_markup = InlineKeyboardMarkup([[InlineKeyboardButton('Retry', callback_data='/retry')]])
       await self.bot.edit_message_text(chat_id=chat_id, message_id=sent_message_id, text="Error generating response", reply_markup=retry_markup)
       logging.error(f"Error generating response for chat {chat_id}: {e}")
-    
+
     self.context.chat_state.current_conversation = conversation
 
     self.__add_timeout_task()
