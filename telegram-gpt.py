@@ -2,7 +2,7 @@ import argparse
 import logging
 import os
 from bot import BotOptions, Bot, WebhookOptions
-from gpt import GPTClient, GPTOptions
+from gpt import GPTOptions
 
 logging.basicConfig(
   format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -41,26 +41,6 @@ if __name__ == "__main__":
   )
 
   parser.add_argument(
-    '--chat-id',
-    action='append',
-    type=int,
-    default=get_chat_ids_from_env(),
-    help= "IDs of Allowed chats. Can be specified multiple times. If not specified, the bot will respond to all chats.",
-  )
-  parser.add_argument(
-    '--conversation-timeout',
-    type=int,
-    default=int(os.environ['TELEGRAM_GPT_CONVERSATION_TIMEOUT']) if 'TELEGRAM_GPT_CONVERSATION_TIMEOUT' in os.environ else None,
-    help="Timeout in seconds for a conversation to expire. If not specified, the bot will keep the conversation alive indefinitely.",
-  )
-  parser.add_argument(
-    '--max-message-count',
-    type=int,
-    default=int(os.environ['TELEGRAM_GPT_MAX_MESSAGE_COUNT']) if 'TELEGRAM_GPT_MAX_MESSAGE_COUNT' in os.environ else None,
-    help="Maximum number of messages to keep in the conversation. Earlier messages will be discarded with this option set. If not specified, the bot will keep all messages in the conversation.",
-  )
-
-  parser.add_argument(
     '--data-dir',
     type=str,
     default=os.environ.get('TELEGRAM_GPT_DATA_DIR'),
@@ -78,6 +58,12 @@ if __name__ == "__main__":
     default=os.environ.get('TELEGRAM_GPT_WEBHOOK_LISTEN_ADDRESS') or '0.0.0.0:80',
     help="Address to listen for telegram webhook requests in the format of <ip>:<port>. Only valid when --webhook-url is set. If not specified, 0.0.0.0:80 would be used.",
   )
+  parser.add_argument(
+    '--parse-mode',
+    type=str,
+    default=os.environ.get('TELEGRAM_GPT_PARSE_MODE') or 'MarkdownV2',
+    help="Parse mode for telegram messages. Default to be MarkdownV2.",
+  )
 
   parser.add_argument(
     '--openai-model-name',
@@ -90,10 +76,10 @@ if __name__ == "__main__":
 
   args = parser.parse_args()
 
-  gpt_options = GPTOptions(args.openai_api_key, args.openai_model_name, args.max_message_count)
+  gpt_options = GPTOptions(args.openai_api_key, args.openai_model_name)
 
   webhook_options = WebhookOptions(args.webhook_url, args.webhook_listen_address) if args.webhook_url is not None else None
-  bot_options = BotOptions(args.telegram_token, set(args.chat_id), args.conversation_timeout, args.data_dir, webhook_options)
+  bot_options = BotOptions(args.telegram_token, args.data_dir, args.parse_mode, webhook_options)
   logging.info(f"Starting bot with options: {bot_options}")
 
   bot = Bot(bot_options, gpt_options)

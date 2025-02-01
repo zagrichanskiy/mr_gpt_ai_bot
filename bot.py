@@ -1,19 +1,17 @@
-import logging
-import os
-from chat import ChatData, ChatManager, ChatState, ChatContext
+from chat_base import ChatBase
 from dataclasses import dataclass, field
-from enum import Enum
+from functools import partial
+from gpt import GPTClient, GPTOptions
+from group_chat import GroupChat
+from private_chat import PrivateChat
 from tasks_scheduler import TasksScheduler
-from gpt import GPTClient
-from telegram import Chat, Update, constants
-from telegram.ext import Application, filters, ConversationHandler, PicklePersistence, ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler
+from telegram import User, Update, constants
+from telegram.ext import Application, filters, PicklePersistence, ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler
 from telegram.warnings import PTBUserWarning
-from typing import cast
 from uuid import uuid4
 from warnings import filterwarnings
-from gpt import GPTClient, GPTOptions
-from chat_v2 import ChatV2
-from functools import partial
+import logging
+import os
 
 @dataclass
 class WebhookOptions:
@@ -34,17 +32,32 @@ class WebhookOptions:
 @dataclass
 class BotOptions:
   token: str = field(repr=False)
-  allowed_chat_ids: set[int]
-  conversation_timeout: int|None = None
   data_dir: str|None = None
+  parse_mode: str = 'MarkdownV2'
   webhook: WebhookOptions|None = None
+
+@dataclass
+class ChatFactory:
+  gpt: GPTClient
+  bot_options: BotOptions
+  bot_user: User
+
+  def create(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> ChatBase:
+    chat_id = update.effective_chat.id
+    chat_type = update.effective_chat.type
+    parse_mode = self.bot_options.parse_mode
+
+    if chat_type in [constants.ChatType.GROUP, constants.ChatType.SUPERGROUP]:
+      return GroupChat(self.gpt, context.bot, self.bot_user, chat_id, parse_mode, context.bot_data, context.chat_data)
+    else:
+      return PrivateChat(self.gpt, context.bot, self.bot_user, chat_id, parse_mode, context.bot_data, context.chat_data)
 
 class Bot:
   def __init__(self, bot_options: BotOptions, gpt_options: GPTOptions):
     self.bot_options = bot_options
     self.gpt_options = gpt_options
     self.tasks_scheduler = TasksScheduler()
-    self.chat_dict = dict[int, ChatV2]()
+    self.chat_dict = dict[int, ChatBase]()
 
     filterwarnings(action="ignore", message=r".*CallbackQueryHandler", category=PTBUserWarning)
 
@@ -59,11 +72,17 @@ class Bot:
     logging.info(f"Initializing GPTClient with options: {gpt_options}")
     self.gpt = GPTClient(options=gpt_options)
 
-  async def post_init(self, _: Application):
-    logging.info("Post init")
+    ## Lazy initialization in post_init
+    self.chat_factory = None
 
-    self.app.add_handler(CommandHandler('start', self.create_callback(ChatV2.start), block=False))
-    self.app.add_handler(MessageHandler(filters.TEXT & filters.UpdateType.MESSAGE & (~filters.COMMAND), self.create_callback(ChatV2.handle_message), block=False))
+  async def post_init(self, _: Application):
+    logging.debug("Post init, set handlers and commands list")
+
+    bot_user = await self.app.bot.get_me()
+    self.chat_factory = ChatFactory(self.gpt, self.bot_options, bot_user)
+
+    self.app.add_handler(CommandHandler('start', self.create_callback(ChatBase.start), block=False))
+    self.app.add_handler(MessageHandler(filters.TEXT & filters.UpdateType.MESSAGE & (~filters.COMMAND), self.create_callback(ChatBase.handle_message), block=False))
 
     commands = [
       ('new', "Start a new conversation"),
@@ -74,10 +93,9 @@ class Bot:
     ]
 
     await self.app.bot.set_my_commands(commands)
-    logging.info("Set command list")
 
   async def post_shutdown(self, _: Application):
-    logging.info("Post shutdown")
+    logging.debug("Post shutdown")
 
   def create_callback(self, callback):
     async def handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -85,18 +103,22 @@ class Bot:
         logging.warning(f"Message received but ignored because it doesn't have a chat")
         return
 
+      # Only work in private and group chats
+      if update.effective_chat.type not in [constants.ChatType.PRIVATE, constants.ChatType.GROUP, constants.ChatType.SUPERGROUP]:
+        logging.warning(f"Message received but ignored because it's not a private or group chat")
+        return
+
       chat_id = update.effective_chat.id
 
       if chat_id not in self.chat_dict:
-        self.chat_dict[chat_id] = ChatV2(self.gpt, context.bot, chat_id, context.bot_data, context.chat_data)
+        self.chat_dict[chat_id] = self.chat_factory.create(update, context)
       chat = self.chat_dict[chat_id]
 
       bound_callback = partial(callback, chat)
 
-      result = await self.tasks_scheduler.append_task(chat_id, bound_callback(update, context.args, context.user_data))
+      await self.tasks_scheduler.append_task(chat_id, bound_callback(update, context.args, context.user_data))
       self.tasks_scheduler.remove_task(chat_id)
 
-      return result
     return handler
 
   def run(self):

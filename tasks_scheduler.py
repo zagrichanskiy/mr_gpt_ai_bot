@@ -16,8 +16,8 @@ class TasksScheduler:
       if current_task:
         try:
           await current_task
-        except Exception as e:
-          logging.warning(f"Error {e} in previous task for chat {chat_id}")
+        except Exception as ex:
+          logging.warning(f"Error {ex} in previous task for chat {chat_id}")
       return await coro
 
     self._chat_tasks[chat_id] = asyncio.create_task(chain_task())
