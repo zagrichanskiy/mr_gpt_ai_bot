@@ -1,12 +1,12 @@
+from abc import ABC, abstractmethod
+from bot.gpt import GPTClient
 from dataclasses import dataclass
-from gpt import GPTClient
 from telegram import constants, error, Update, Message, User
 from telegram.ext import ExtBot
+from telegramify_markdown import markdownify
 from typing import Any
 import asyncio
 import logging
-from abc import ABC, abstractmethod
-from telegramify_markdown import markdownify
 
 @dataclass
 class Formatter:

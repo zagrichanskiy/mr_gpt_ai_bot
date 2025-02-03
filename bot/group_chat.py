@@ -1,4 +1,4 @@
-from chat_base import ChatBase
+from bot.chat_base import ChatBase
 from telegram import Message
 
 class GroupChat(ChatBase):
