@@ -1,5 +1,5 @@
-import asyncio
 from dataclasses import dataclass
+import asyncio
 import logging
 
 class TasksScheduler:

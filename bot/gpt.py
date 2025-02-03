@@ -1,9 +1,9 @@
+from aiohttp import ClientSession
+from bot.thread import Thread
 from dataclasses import dataclass, field
+from typing import cast, AsyncGenerator
 import logging
 import openai
-from aiohttp import ClientSession
-from typing import cast, AsyncGenerator
-from thread import Thread
 
 @dataclass
 class GPTOptions:
