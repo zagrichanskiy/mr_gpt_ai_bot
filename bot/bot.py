@@ -8,7 +8,6 @@ from functools import partial
 from telegram import User, Update, constants
 from telegram.ext import Application, filters, PicklePersistence, ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler
 from telegram.warnings import PTBUserWarning
-from uuid import uuid4
 from warnings import filterwarnings
 import logging
 import os
@@ -31,9 +30,9 @@ class ChatFactory:
         parse_mode = self.bot_options.parse_mode
 
         if chat_type in [constants.ChatType.GROUP, constants.ChatType.SUPERGROUP]:
-            return GroupChat(self.gpt, context.bot, self.bot_user, chat_id, parse_mode, context.bot_data, context.chat_data)
+            return GroupChat(self.gpt, context.application, context.bot, self.bot_user, chat_id, parse_mode, context.bot_data, context.chat_data)
         else:
-            return PrivateChat(self.gpt, context.bot, self.bot_user, chat_id, parse_mode, context.bot_data, context.chat_data)
+            return PrivateChat(self.gpt, context.application, context.bot, self.bot_user, chat_id, parse_mode, context.bot_data, context.chat_data)
 
 class Bot:
     def __init__(self, bot_options: BotOptions, gpt_options: GPTOptions):
@@ -55,7 +54,7 @@ class Bot:
         logging.info(f"Initializing GPTClient with options: {gpt_options}")
         self.gpt = GPTClient(options=gpt_options)
 
-        ## Lazy initialization in post_init
+        ## Initialization in post_init
         self.chat_factory = None
 
     async def post_init(self, _: Application):
@@ -65,6 +64,9 @@ class Bot:
         self.chat_factory = ChatFactory(self.gpt, self.bot_options, bot_user)
 
         self.app.add_handler(CommandHandler('start', self.create_callback(ChatBase.start), block=False))
+        self.app.add_handler(CommandHandler('show_chats', self.create_callback(ChatBase.show_chats), block=False))
+        self.app.add_handler(CommandHandler('show_history', self.create_callback(ChatBase.show_history), block=False))
+
         self.app.add_handler(MessageHandler(filters.TEXT & filters.UpdateType.MESSAGE & (~filters.COMMAND), self.create_callback(ChatBase.handle_message), block=False))
 
         # commands = [
