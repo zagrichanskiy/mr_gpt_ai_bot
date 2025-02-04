@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
 from bot.gpt import GPTClient
 from bot.thread import Thread
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
+from datetime import datetime, timezone
 from telegram import constants, error, Update, Message, User
 from telegram.ext import Application, ExtBot
 from telegramify_markdown import markdownify
@@ -121,19 +122,17 @@ class ChatBase(ABC):
         thread = chat_data.get("thread")
 
         with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as temp_file:
-            for message in thread.messages:
-                temp_file.write(json.dumps(message.to_dict(), indent=2, ensure_ascii=False) + '\n')
-            temp_file_path = temp_file.name
+            json.dump(asdict(thread), temp_file, default=str, indent=2, ensure_ascii=False)
 
         try:
             await self.reply_message_document(
                 update.message,
                 open(temp_file.name, 'rb'),
-                f"chat_{chat_id}_history.txt",
+                f"chat_{chat_id}_history_{datetime.now(timezone.utc).isoformat()}.txt",
                 f"History of chat {chat_id}"
             )
         finally:
-            os.remove(temp_file_path)
+            os.remove(temp_file.name)
 
     async def handle_message(self, update: Update, args: list[str] | None, user_data: dict[Any, Any]):
         if not update.message or not update.message.text:

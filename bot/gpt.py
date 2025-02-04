@@ -72,7 +72,7 @@ Your response must never contain metadata. Generate only human-like replies.
         try:
             generator = await openai.ChatCompletion.acreate(
                 model=self.__model_name,
-                messages=thread.to_list(),
+                messages=thread.to_openai_list(),
                 stream=True,
             )
 

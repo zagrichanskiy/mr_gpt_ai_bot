@@ -6,7 +6,11 @@ class GroupChat(ChatBase):
         text = message.text
 
         mentioned = f"@{self.bot_user.username}" in text
-        quoted = message.reply_to_message and message.reply_to_message.from_user.id == self.bot_user.id
+        quoted = (
+            message.reply_to_message # message is a reply in thread
+            and message.reply_to_message.from_user.id == self.bot_user.id # message is a reply to the bot's message
+            and message.from_user.id != self.bot_user.id # message is not from the bot
+        )
 
         return mentioned or quoted
 
