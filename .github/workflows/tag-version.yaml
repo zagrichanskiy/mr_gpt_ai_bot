@@ -4,6 +4,9 @@ on:
   push:
     branches: [ dev ]
 
+permissions:
+  contents: write
+
 env:
   USER_NAME: Oleh Zahrychanskyi
   USER_EMAIL: zagrichanskiy@gmail.com
@@ -50,4 +53,10 @@ jobs:
           git config user.email "$USER_EMAIL"
           git tag "$VERSION"
           git push origin "$VERSION"
-          gh workflow run deploy-to-aws.yaml --ref $VERSION
+
+      - name: Trigger build-and-push
+        if: steps.check_tag.outputs.tag_exists == 'false'
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          event-type: build-and-push

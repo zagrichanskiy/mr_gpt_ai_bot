@@ -1,0 +1,39 @@
+name: Deploy latest image
+
+on:
+  repository_dispatch:
+    types: [deploy-latest]
+
+env:
+  SERVICE_NAME: ${{ github.event.repository.name }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SERVER_SSH_KEY }}
+
+      - name: Deploy latest ${{ env.SERVICE_NAME }}
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} <<'EOF'
+            set -e
+
+            echo "Detecting docker-compose path for container $SERVICE_NAME..."
+            SERVICE_NAME="${{ env.SERVICE_NAME }}"
+            WORK_DIR="${{ secrets.SERVER_WORK_DIR }}"
+
+            echo "Switch to working directory: $WORK_DIR"
+            cd "$WORK_DIR"
+
+            echo "Pulling latest image from registry..."
+            docker compose pull "$SERVICE_NAME"
+
+            echo "Recreating container from latest image..."
+            docker compose up -d --no-deps --force-recreate "$SERVICE_NAME"
+
+            echo "Deployment completed."
+          EOF
