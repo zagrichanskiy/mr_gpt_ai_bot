@@ -55,3 +55,10 @@ jobs:
           tags: |
             ${{ steps.create_tags.outputs.version_tag }}
             ${{ steps.create_tags.outputs.latest_tag }}
+
+      - name: Trigger deployment if latest was tagged
+        if: steps.create_tags.outputs.latest_tag != ''
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          event-type: deploy-latest
